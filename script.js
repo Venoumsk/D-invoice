@@ -15,12 +15,12 @@ function setInvoiceMeta() {
 }
 
 function addItem() {
-    const itemName = itemNameInput();
+    const itemName = document.getElementById("itemName").value.trim();
     const qty = Number(document.getElementById("qty").value);
     const price = Number(document.getElementById("price").value);
 
     if (!itemName || qty <= 0 || price <= 0) {
-        alert("Enter valid item details");
+        alert("⚠️ Please enter valid item details");
         return;
     }
 
@@ -30,8 +30,10 @@ function addItem() {
 }
 
 function removeItem(index) {
-    items.splice(index, 1);
-    updateInvoice();
+    if (confirm("🗑️ Are you sure you want to remove this item?")) {
+        items.splice(index, 1);
+        updateInvoice();
+    }
 }
 
 function updateInvoice() {
@@ -46,33 +48,43 @@ function updateInvoice() {
     saveShopDetails();
 
     const tbody = document.getElementById("invoiceItems");
-    tbody.innerHTML = "";
-
-    let subtotal = 0;
-
-    items.forEach((item, i) => {
-        const total = item.qty * item.price;
-        subtotal += total;
-
-        tbody.innerHTML += `
+    
+    if (items.length === 0) {
+        tbody.innerHTML = `
             <tr>
-                <td>${item.itemName}</td>
-                <td>${item.qty}</td>
-                <td>${item.price.toFixed(2)}</td>
-                <td>${total.toFixed(2)}</td>
-                <td><button onclick="removeItem(${i})">❌</button></td>
+                <td colspan="5" class="empty-state">
+                    <p>No items added yet</p>
+                </td>
             </tr>
         `;
-    });
+    } else {
+        tbody.innerHTML = "";
+        let subtotal = 0;
 
-    const cgst = subtotal * 0.09;
-    const sgst = subtotal * 0.09;
+        items.forEach((item, i) => {
+            const total = item.qty * item.price;
+            subtotal += total;
 
-    document.getElementById("subTotal").innerText = subtotal.toFixed(2);
-    document.getElementById("cgst").innerText = cgst.toFixed(2);
-    document.getElementById("sgst").innerText = sgst.toFixed(2);
-    document.getElementById("grandTotal").innerText =
-        (subtotal + cgst + sgst).toFixed(2);
+            tbody.innerHTML += `
+                <tr>
+                    <td>${item.itemName}</td>
+                    <td>${item.qty}</td>
+                    <td>₹${item.price.toFixed(2)}</td>
+                    <td>₹${total.toFixed(2)}</td>
+                    <td class="no-print"><button onclick="removeItem(${i})">🗑️ Remove</button></td>
+                </tr>
+            `;
+        });
+
+        const cgst = subtotal * 0.09;
+        const sgst = subtotal * 0.09;
+
+        document.getElementById("subTotal").innerText = subtotal.toFixed(2);
+        document.getElementById("cgst").innerText = cgst.toFixed(2);
+        document.getElementById("sgst").innerText = sgst.toFixed(2);
+        document.getElementById("grandTotal").innerText =
+            (subtotal + cgst + sgst).toFixed(2);
+    }
 }
 
 function saveShopDetails() {
@@ -94,16 +106,30 @@ function finalizeInvoice() {
     invoiceCounter++;
     localStorage.setItem("invoiceCounter", invoiceCounter);
     items = [];
+    document.getElementById("customerName").value = "";
     updateInvoice();
     setInvoiceMeta();
 }
 
 function printInvoice() {
+    if (items.length === 0) {
+        alert("⚠️ Please add at least one item before printing");
+        return;
+    }
     window.print();
     finalizeInvoice();
 }
 
 document.getElementById("downloadPdf").addEventListener("click", () => {
+    if (items.length === 0) {
+        alert("⚠️ Please add at least one item before downloading");
+        return;
+    }
+    
+    const button = document.getElementById("downloadPdf");
+    button.textContent = "⏳ Generating PDF...";
+    button.disabled = true;
+    
     html2pdf().set({
         margin: 10,
         filename: `Invoice_${document.getElementById("invoiceNo").innerText}.pdf`,
@@ -111,18 +137,27 @@ document.getElementById("downloadPdf").addEventListener("click", () => {
         html2canvas: { scale: 2 },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
     }).from(document.getElementById("invoice")).save()
-      .then(finalizeInvoice);
+      .then(() => {
+          button.textContent = "📥 Download PDF";
+          button.disabled = false;
+          finalizeInvoice();
+      });
 });
 
-/* Helpers */
-function itemNameInput() {
-    const el = document.getElementById("itemName");
-    const val = el.value.trim();
-    el.value = "";
-    return val;
-}
-
 function clearItemInputs() {
+    document.getElementById("itemName").value = "";
     document.getElementById("qty").value = "";
     document.getElementById("price").value = "";
+    document.getElementById("itemName").focus();
 }
+
+// Add Enter key support for item inputs
+document.getElementById("itemName").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") document.getElementById("qty").focus();
+});
+document.getElementById("qty").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") document.getElementById("price").focus();
+});
+document.getElementById("price").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") addItem();
+});
